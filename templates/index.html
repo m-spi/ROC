@@ -12,22 +12,24 @@
     <table>
         <thead>
             <tr>
+                <th>Identifiant Carte</th>
                 <th>Horodatage</th>
                 <th>Température (°C)</th>
                 <th>Humidité (%)</th>
                 <th>Humidité du sol (%)</th>
+                <th>Luminosité (sans unité)</th>
             </tr>
         </thead>
         <tbody id="sensor-data">
-            {% for entry in sensor_data %}
-                {% for device in entry %}
-                    <tr>
-                        <td>{{ sensor.timestamp }}</td>
-                        <td>{{ sensor.airtemp }}</td>
-                        <td>{{ sensor.air_hum }}</td>
-                        <td>{{ sensor.soil_moisture }}</td>
-                    </tr>
-                {% endfor %}
+            {% for (device_addr, device) in sensor_data[-1].items() %}
+                <tr>
+                    <td>{{ device_addr }}</td>
+                    <td>{{ device.timestamp }}</td>
+                    <td>{{ device.airtemp }}</td>
+                    <td>{{ device.air_hum }}</td>
+                    <td>{{ device.soil_moisture }}</td>
+                    <td>{{ device.light }}</td>
+                </tr>
             {% endfor %}
         </tbody>
     </table>
@@ -36,6 +38,24 @@
     <script src="{{ url_for('static', filename='js/plotly.min.js') }}"></script>
 
     <script>
+        document.addEventListener("DOMContentLoaded", async (event) => {
+            try {
+                // Faire une requête GET au serveur Flask pour récupérer les données des capteurs
+                const response = await fetch('/get-sensor-data');
+                if (!response.ok) {
+                    throw new Error("Erreur HTTP : ${response.status}");
+                }
+
+                const data = await response.json();
+                data.forEach(function (entry) {
+                    updateTable(entry);
+                    updateGraph(entry);
+                });
+            } catch (error) {
+                console.error('Erreur lors de la récupération des données:', error);
+            }
+        });
+
         async function fetchSensorData() {
             try {
                 // Faire une requête GET au serveur Flask pour récupérer les données des capteurs
@@ -59,6 +79,9 @@
             Object.values(data).forEach(function (device) {
                 const row = document.createElement('tr');
 
+                const addrCell = document.createElement('td');
+                addrCell.textContent = Object.keys(data).find(key => data[key] === device)
+
                 const timestampCell = document.createElement('td');
                 timestampCell.textContent = new Date(device.timestamp).toLocaleString();
 
@@ -71,18 +94,21 @@
                 const soilMoistureCell = document.createElement('td');
                 soilMoistureCell.textContent = device.soil_moisture;
 
+                const lightCell = document.createElement('td');
+                lightCell.textContent = device.light;
+
+                row.appendChild(addrCell);
                 row.appendChild(timestampCell);
                 row.appendChild(tempCell);
                 row.appendChild(humidityCell);
                 row.appendChild(soilMoistureCell);
+                row.appendChild(lightCell);
 
                 tableBody.appendChild(row);
             })
         }
 
         function updateGraph(data) {
-            console.log("in updateGraph data=")
-            console.log(data)
             let i = 0
             Object.values(data).forEach(function (device) {
                 if(!document.getElementById("graph"+i)){
@@ -116,6 +142,13 @@
                         name: 'Humidité du sol (%)',
                         line: { color: 'brown' }
                     };
+                    let lightTraceStyle = {
+                        x: [],
+                        y: [],
+                        mode: 'lines+markers',
+                        name: 'Luminosité (sans unité)',
+                        line: { color: 'yellow' }
+                    };
 
                     newGraph = document.createElement("div")
                     newGraph.setAttribute("id", "graph"+i)
@@ -123,27 +156,22 @@
 
                     Plotly.newPlot(
                         "graph"+i, 
-                        [tempTraceStyle, humidityTraceStyle, soilMoistureTraceStyle], 
+                        [tempTraceStyle, humidityTraceStyle, soilMoistureTraceStyle, lightTraceStyle], 
                         layout
                     );
                 }
 
                 // Mettre à jour le graphique
-                console.log("updating graph"+i+"with")
-                console.log(device)
                 Plotly.extendTraces('graph'+i, 
-                    {x: [[device.timestamp], [device.timestamp], [device.timestamp]],
-                     y: [[device.air_temp], [device.air_hum], [device.soil_moisture]]},
-                    [0, 1, 2]);
+                    {x: [[device.timestamp], [device.timestamp], [device.timestamp], [device.timestamp]],
+                     y: [[device.air_temp], [device.air_hum], [device.soil_moisture], [device.light]]},
+                    [0, 1, 2, 3]);
 
                 i++
             })
         }
 
-        // Appeler la fonction pour récupérer les données au chargement de la page
-        fetchSensorData();
-
-        // Rafraîchir les données toutes les 10 secondes
+        // Rafraîchir les données toutes les 3 secondes
         setInterval(fetchSensorData, 3000);
     </script>
 {% endblock %}

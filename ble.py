@@ -32,6 +32,7 @@ charac_uuids = {
         "19b10001e8f2537e4f6cd104768a1214": "air_temp",
         "ff7b36c646fd4577af827bc30c876221": "air_hum",
         "6041f41ecfee4a0f96e0ce7ba222482e": "soil_moisture",
+        "d29d5d7e9e2440d9b658ddeeae8e9be6": "light",
         }
 
 class ScannerDelegate(DefaultDelegate): 
@@ -96,17 +97,20 @@ def readCharacteristics():
                     print(f"### ERROR: Reading from device failed ###\n### {err=} ###")
                 data[device_addr][charac_uuids[str_uuid]] = struct.unpack('f', charac["value"])[0]
 
-    print(f"\nin ble.py: {data=}")
-
     json.dump(data, fp=data_file)
 
 
 def reconnectToDevices():
     for (device_addr, device) in ble_devices_characteristics.items():
+        # Check if connection is good
         try:
-            device[0]["peripheral"].connect(device_addr)
-        except Exception as err:
-            print(f"### ERROR: Can't reconnect after scan ###\n### {err=} ###")
+            device[0]["peripheral"].readCharacteristic(device[0]["handle"])
+        except:
+            # Connection is not good, reconnect
+            try:
+                device[0]["peripheral"].connect(device_addr)
+            except Exception as err:
+                print(f"### ERROR: Can't reconnect after scan ###\n### {err=} ###")
 
 
 scannerDelegate = ScannerDelegate()
@@ -126,7 +130,7 @@ if __name__ == "__main__":
                 pass
             reconnectToDevices()
         else:
-            sleep(3)
             readCharacteristics()
+            sleep(3)
 
         i += 1

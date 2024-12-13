@@ -79,7 +79,10 @@ def get_last_sensor_data_route():
         # Récupérer les données de la base de données
         read_json()
         # Retourner les données sous format JSON
-        return jsonify(devicesData[-1])
+        if len(devicesData):
+            return jsonify(devicesData[-1])
+        else: 
+            return jsonify(list())
     except Exception as e:
          print(f"Erreur lors de la récupération des données : {e}")
          return jsonify({'status': 'error', 'message': 'Erreur serveur'}), 500

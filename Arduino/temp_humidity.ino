@@ -34,12 +34,14 @@ const char* device_service_uuid = "185A";
 const char* air_temp_characteristic_uuid = "19b10001-e8f2-537e-4f6c-d104768a1214";
 const char* air_hum_characteristic_uuid = "ff7b36c6-46fd-4577-af82-7bc30c876221";
 const char* soil_moisture_characteristic_uuid = "6041f41e-cfee-4a0f-96e0-ce7ba222482e";
+const char* light_characteristic_uuid = "d29d5d7e-9e24-40d9-b658-ddeeae8e9be6";
 
 // Global variables
 BLEService service(device_service_uuid);
 BLEFloatCharacteristic airTempCharac(air_temp_characteristic_uuid, BLERead);
 BLEFloatCharacteristic airHumCharac(air_hum_characteristic_uuid, BLERead);
 BLEFloatCharacteristic soilMoistureCharac(soil_moisture_characteristic_uuid, BLERead);
+BLEFloatCharacteristic lightCharac(light_characteristic_uuid, BLERead);
 
 byte manufacturer_data[6] = { 1, 2, 3, 4, 5, 6 };
 
@@ -47,7 +49,7 @@ byte manufacturer_data[6] = { 1, 2, 3, 4, 5, 6 };
 float old_air_temp = -1000.0;
 float old_air_hum = -1000.0;
 float old_soil_moisture = -1000.0;
-float old_soil_temp = -1000.0;
+float old_light = -1000.0;
 
 
 /*** Setup function ***/
@@ -62,8 +64,8 @@ void setup() {
 
   // Will wait for 1 second to start the sensor
   moistureSensor.begin(true);
-  // Start measurements so that next reads will be immediate
-  moistureSensor.startMeasureLight();
+  // Start measurements so that next reads will be immediate, will wait 3 seconds
+  moistureSensor.getLight(true);
   moistureSensor.getCapacitance();
 
 
@@ -83,6 +85,7 @@ void setup() {
   service.addCharacteristic(airTempCharac);
   service.addCharacteristic(airHumCharac);
   service.addCharacteristic(soilMoistureCharac);
+  service.addCharacteristic(lightCharac);
   BLE.addService(service);
   //BLE.setAdvertisedService(Temp_service);
   //Temp_charac.writeValue(33);
@@ -100,6 +103,7 @@ void loop() {
   double air_temperature;
   double air_humidity;
   double soil_moisture;
+  double light;
 
   if (central) {
     while (central.connected()) {
@@ -125,6 +129,9 @@ void loop() {
       }
 
       if (!moistureSensor.isBusy()) {
+        moistureSensor.startMeasureLight();
+        light = (double)moistureSensor.getLight();
+        light = 4000 / light;
         // Moisture formula is based on https://github.com/Miceuz/i2c-moisture-sensor/blob/master/Soil%20Moisture%20Sensor%20Calibration.pdf
         soil_moisture = (double)moistureSensor.getCapacitance();
         soil_moisture = (0.0001007 * soil_moisture * soil_moisture) + (0.0024885 * soil_moisture) - 6.2508722;
@@ -135,6 +142,14 @@ void loop() {
           old_soil_moisture = soil_moisture;
 
           soilMoistureCharac.writeValue(soil_moisture);
+        }
+
+        if (abs(old_light - light) >= 0.05) {
+          Serial.print("Light : ");
+          Serial.println(light);
+          old_light = light;
+
+          lightCharac.writeValue(light);
         }
       }
     }
